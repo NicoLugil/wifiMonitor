@@ -21,12 +21,13 @@ import sys
 import time
 import string
 import datetime
-from subprocess import call
+import subprocess 
 import StringIO
 import logging
 import logging.handlers
 from shutil import copyfile
 import glob,os 
+import re
 
 from TimedActions import TimedActions
 import lib.pythonping
@@ -46,10 +47,20 @@ def copylog():
       copyfile(LOGFILE+".log",LOGFILESD+now()+".log")
 
 def wifi_down_up():
-      call(["wifi","down"], stdout=open(os.devnull, 'wb'))
+      subprocess.call(["wifi","down"], stdout=open(os.devnull, 'wb'))
       time.sleep(5)
-      call("wifi", stdout=open(os.devnull, 'wb'))
+      subprocess.call("wifi", stdout=open(os.devnull, 'wb'))
       time.sleep(5)
+
+def get_wifi_info():
+      p = subprocess.Popen(["iwconfig","wlan0"], stdout=subprocess.PIPE)
+      out, err = p.communicate()
+      m=re.search(r"Link.*dBm",out)
+      if m is None:
+          print "No Match found"
+          return "no-info"
+      else:
+          return m.group(0)
 
 def runit():
 
@@ -83,6 +94,7 @@ def runit():
       while True:
          time.sleep(5)
          if timer_checkwifi.enough_time_passed():
+             link_q = get_wifi_info()
              ping_delay = lib.pythonping.do_one(TO_PING,5)  
              if ping_delay is None:
                   n_err=n_err+1
@@ -95,7 +107,7 @@ def runit():
              else:
                   n_ok=n_ok+1
                   uptime = datetime.datetime.now()-starttime
-                  my_logger.debug("{0} : wifi OK, uptime={1}, ok/nok: {2}/{3}".format(now(),uptime,n_ok,n_err))
+                  my_logger.debug("{0} : wifi OK, uptime={1}, ok/nok: {2}/{3} - {4}".format(now(),uptime,n_ok,n_err,link_q))
          if timer_cp2SD.enough_time_passed():
              copylog()                     
     except Exception as e:
