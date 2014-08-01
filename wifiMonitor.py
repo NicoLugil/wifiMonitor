@@ -36,15 +36,21 @@ LOGFILE="/tmp/wifiMonitor"
 LOGFILESD="/mnt/sda1/arduino/wifiMonitor_"
 RESTART_WIFI_WHEN_LOST = True
 TO_PING = "192.168.1.1"
+KEEP_ONLY_LAST_BACKUP = True   # if false --> will grow forever, could run out of 'disk' space
+CHECK_WIFI_INTERVAL = 16  # seconds
+BACKUP_INTERVAL = 3600 # seconds
 
 def now():
       now_t=datetime.datetime.now()
       now_str=now_t.strftime("%Y-%m-%d %H:%M")
       return now_str
 
-def copylog():
+def copylog(single):
       # only copy last part
-      copyfile(LOGFILE+".log",LOGFILESD+now()+".log")
+      if single:
+         copyfile(LOGFILE+".log",LOGFILESD+"last.log")
+      else:
+         copyfile(LOGFILE+".log",LOGFILESD+now()+".log")
 
 def wifi_down_up():
       subprocess.call(["wifi","down"], stdout=open(os.devnull, 'wb'))
@@ -64,7 +70,7 @@ def get_wifi_info():
 
 def runit():
 
-  print "log will be written to" + LOGFILE + ".log and backed up at " + LOGFILESD + "<time>.log"
+  print "log will be written to" + LOGFILE + ".log and backed up at " + LOGFILESD + "..."
      
   filelist=glob.glob(LOGFILE+"*") 
   for f in filelist: 
@@ -77,8 +83,8 @@ def runit():
   handler = logging.handlers.RotatingFileHandler(LOGFILE+".log", maxBytes=16384, backupCount=2)
   my_logger.addHandler(handler)
 
-  timer_checkwifi = TimedActions(16)  # check every ... sec
-  timer_cp2SD = TimedActions(900) # copy last part of log to SD every 15 min
+  timer_checkwifi = TimedActions(CHECK_WIFI_INTERVAL)  
+  timer_cp2SD = TimedActions(BACKUP_INTERVAL) 
 
   n_ok=0
   n_err=0
@@ -109,14 +115,14 @@ def runit():
                   uptime = datetime.datetime.now()-starttime
                   my_logger.debug("{0} : wifi OK, uptime={1}, ok/nok: {2}/{3} - {4}".format(now(),uptime,n_ok,n_err,link_q))
          if timer_cp2SD.enough_time_passed():
-             copylog()                     
+             copylog(KEEP_ONLY_LAST_BACKUP)                     
     except Exception as e:
       my_logger.debug("--- Exception caught ---")
       template = "{2} : An exception of type {0} occured. Arguments:\n{1!r}"
       message = template.format(type(e).__name__, e.args, now())
       my_logger.debug(str(message))
       my_logger.debug("----")
-      copylog()                     
+      copylog(KEEP_ONLY_LAST_BACKUP)                     
       time.sleep(3)
       #break
 
