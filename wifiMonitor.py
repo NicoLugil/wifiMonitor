@@ -36,7 +36,7 @@ LOGFILE="/tmp/wifiMonitor"
 LOGFILESD="/mnt/sda1/arduino/wifiMonitor_"
 RESTART_WIFI_WHEN_LOST = True
 TO_PING = "192.168.1.1"
-KEEP_ONLY_LAST_BACKUP = True   # if false --> will grow forever, could run out of 'disk' space
+KEEP_ONLY_LAST_BACKUP = True    # if false --> will grow forever, could run out of 'disk' space
 CHECK_WIFI_INTERVAL = 16  # seconds
 BACKUP_INTERVAL = 3600 # seconds
 
@@ -52,11 +52,17 @@ def copylog(single):
       else:
          copyfile(LOGFILE+".log",LOGFILESD+now()+".log")
 
+#def wifi_down_up():
+#      subprocess.call(["wifi","down"], stdout=open(os.devnull, 'wb'))
+#      time.sleep(5)
+#      subprocess.call("wifi", stdout=open(os.devnull, 'wb'))
+#      time.sleep(5)
+
 def wifi_down_up():
-      subprocess.call(["wifi","down"], stdout=open(os.devnull, 'wb'))
-      time.sleep(5)
-      subprocess.call("wifi", stdout=open(os.devnull, 'wb'))
-      time.sleep(5)
+    subprocess.call(["wifi","down"], stdout=None)   #open(os.devnull, 'wb'))
+    time.sleep(5)
+    subprocess.call("wifi", stdout=None)            #open(os.devnull, 'wb'))
+    time.sleep(5)      
 
 def get_wifi_info():
       p = subprocess.Popen(["iwconfig","wlan0"], stdout=subprocess.PIPE)
@@ -115,14 +121,23 @@ def runit():
                   uptime = datetime.datetime.now()-starttime
                   my_logger.debug("{0} : wifi OK, uptime={1}, ok/nok: {2}/{3} - {4}".format(now(),uptime,n_ok,n_err,link_q))
          if timer_cp2SD.enough_time_passed():
-             copylog(KEEP_ONLY_LAST_BACKUP)                     
+             try:
+                copylog(KEEP_ONLY_LAST_BACKUP)                     
+             except Exception as e:
+              # we must accept that we cant log to SD
+              my_logger.debug("--- Exception caught when trying to copylog ---")
+              template = "{2} : An exception of type {0} occured. Arguments:\n{1!r}"
+              message = template.format(type(e).__name__, e.args, now())
+              my_logger.debug(str(message))
+              my_logger.debug("----")
+              time.sleep(3)
     except Exception as e:
       my_logger.debug("--- Exception caught ---")
       template = "{2} : An exception of type {0} occured. Arguments:\n{1!r}"
       message = template.format(type(e).__name__, e.args, now())
       my_logger.debug(str(message))
       my_logger.debug("----")
-      copylog(KEEP_ONLY_LAST_BACKUP)                     
+      #copylog(KEEP_ONLY_LAST_BACKUP)    <--- could make script crash if copylog throws exception   
       time.sleep(3)
       #break
 
